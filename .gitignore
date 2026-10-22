@@ -1,0 +1,14 @@
+
+# Cópia de segurança local
+Copiadeseguranca/
+
+# Arquivos temporários do Python
+__pycache__/
+*.py[cod]
+
+# Configurações locais do editor
+.vscode/
+
+# Dados locais de estoque e histórico
+produtos.json
+movimentacoes.json
