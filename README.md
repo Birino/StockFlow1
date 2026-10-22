@@ -66,7 +66,7 @@ Este projeto permite praticar:
 
 - [ ] Criar testes automatizados
 - [ ] Separar o código em módulos
-- [ ] Desenvolver uma interface gráfica
+- [x] Desenvolver uma interface gráfica
 - [ ] Adicionar relatórios de estoque
 - [ ] Implementar banco de dados
 - [ ] Melhorar a experiência de uso
