@@ -12,3 +12,5 @@ __pycache__/
 # Dados locais de estoque e histórico
 produtos.json
 movimentacoes.json
+
+main_terminal_backup.py
