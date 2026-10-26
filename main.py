@@ -355,14 +355,21 @@ class StockFlowApp(ctk.CTk):
                     padx=8, pady=10
                 )
 
-            ctk.CTkFrame(
-                tabela, height=1, fg_color=BORDA
-            ).grid(
-                row=indice, column=0,
-                columnspan=len(cabecalhos), sticky="ew"
-            )
+        for indice, linha in enumerate(linhas, start=1):
+            for coluna, valor in enumerate(linha):
+                ctk.CTkLabel(
+                    tabela,
+                    text=str(valor),
+                    text_color=TEXTO,
+                    anchor="w",
+                    font=ctk.CTkFont(size=12)
+                ).grid(
+                    row=indice, column=coluna, sticky="ew",
+                    padx=8, pady=10
+                )
 
         return tabela
+
 
     def botao(self, pai, texto, comando, cor=AZUL):
         return ctk.CTkButton(
@@ -430,17 +437,76 @@ class StockFlowApp(ctk.CTk):
             linhas
         )
 
-        self.botao(
-            self.area, "Ver todos os produtos",
-            lambda: self.mostrar_pagina("Produtos")
-        ).grid(row=2, column=0, sticky="w", pady=6)
+        
+        botao_produtos = self.botao(
+            self.area,
+            "Ver todos os produtos",
+            lambda: self.mostrar_pagina("Produtos"),
+        )
 
-        if baixos:
-            ctk.CTkLabel(
-                self.area,
-                text=f"⚠  {len(baixos)} produto(s) com estoque baixo.",
-                text_color=AMARELO
-            ).grid(row=3, column=0, sticky="w", pady=12)
+        botao_produtos.grid(
+            row=7,
+            column=0,
+            sticky="w",
+            pady=(8, 16),
+        )
+
+        # Resumo das movimentações recentes
+        self.secao("Movimentações recentes", 8)
+
+        recentes_movimentacoes = list(
+            reversed(self.movimentacoes)
+        )[:5]
+
+        linhas_movimentacoes = []
+
+        for movimento in recentes_movimentacoes:
+            try:
+                data = datetime.fromisoformat(
+                    movimento["data_hora"]
+                ).astimezone().strftime("%d/%m/%Y %H:%M")
+            except (ValueError, KeyError):
+                data = movimento.get("data_hora", "—")
+
+            tipo_movimento = movimento.get("tipo", "")
+
+            if tipo_movimento == "entrada":
+                tipo_exibido = "↑ Entrada"
+            else:
+                tipo_exibido = "↓ Saída"
+
+            linhas_movimentacoes.append(
+                (
+                    data,
+                    movimento.get("produto", "—"),
+                    tipo_exibido,
+                    movimento.get("quantidade", "—"),
+                    movimento.get("estoque_atual", "—"),
+                )
+            )
+
+        self.criar_tabela(
+            [
+                "Data e hora",
+                "Produto",
+                "Movimentação",
+                "Quantidade",
+                "Estoque final",
+            ],
+            linhas_movimentacoes,
+        )
+
+        self.botao(
+            self.area,
+            "Ver histórico completo",
+            lambda: self.mostrar_pagina("Histórico"),
+        ).grid(
+            row=10,
+            column=0,
+            sticky="w",
+            pady=(4, 16),
+        )
+
 
     # --------------------------------------------------
     # PRODUTOS
@@ -470,6 +536,7 @@ class StockFlowApp(ctk.CTk):
 
         self.atualizar_tabela_produtos()
 
+ 
     def atualizar_tabela_produtos(self):
         if not hasattr(self, "tabela_produtos"):
             return
@@ -477,65 +544,141 @@ class StockFlowApp(ctk.CTk):
         for widget in self.tabela_produtos.winfo_children():
             widget.destroy()
 
-        termo = self.busca.get().strip().lower() if hasattr(self, "busca") else ""
+        termo = (
+            self.busca.get().strip().lower()
+            if hasattr(self, "busca")
+            else ""
+        )
 
         filtrados = [
             p for p in self.produtos
-            if termo in p["nome"].lower() or termo == str(p["id"])
+            if termo in p["nome"].lower()
+            or termo == str(p["id"])
         ]
 
-        cabecalhos = ["ID", "Produto", "Qtd.", "Preço", "Total", "Situação"]
+        cabecalhos = [
+            "ID",
+            "Produto",
+            "Qtd.",
+            "Preço",
+            "Total",
+            "Situação",
+            "Ações",
+        ]
+
         tabela = ctk.CTkFrame(
-            self.tabela_produtos, fg_color=PAINEL, corner_radius=10
+            self.tabela_produtos,
+            fg_color=PAINEL,
+            corner_radius=10,
         )
         tabela.grid(row=0, column=0, sticky="ew")
+
         for coluna in range(len(cabecalhos)):
             tabela.grid_columnconfigure(coluna, weight=1)
 
         for coluna, titulo in enumerate(cabecalhos):
             ctk.CTkLabel(
-                tabela, text=titulo, text_color=SECUNDARIO,
-                fg_color=CARTAO, anchor="w",
-                font=ctk.CTkFont(size=11, weight="bold")
+                tabela,
+                text=titulo,
+                text_color=SECUNDARIO,
+                fg_color=CARTAO,
+                anchor="w",
+                font=ctk.CTkFont(size=11, weight="bold"),
             ).grid(
-                row=0, column=coluna, sticky="ew",
-                padx=3, pady=4, ipady=8
+                row=0,
+                column=coluna,
+                sticky="ew",
+                padx=3,
+                pady=4,
+                ipady=8,
             )
 
         if not filtrados:
             ctk.CTkLabel(
-                tabela, text="Nenhum produto encontrado.",
-                text_color=SECUNDARIO
-            ).grid(row=1, column=0, columnspan=6, pady=20)
+                tabela,
+                text="Nenhum produto encontrado.",
+                text_color=SECUNDARIO,
+            ).grid(
+                row=1,
+                column=0,
+                columnspan=len(cabecalhos),
+                pady=20,
+            )
             return
 
-        for indice, p in enumerate(filtrados, start=1):
-            baixo = p["quantidade"] <= p["estoque_minimo"]
+        for indice, produto in enumerate(filtrados, start=1):
+            baixo = (
+                produto["quantidade"]
+                <= produto["estoque_minimo"]
+            )
+
             valores = [
-                p["id"], p["nome"], p["quantidade"],
-                moeda(p["preco"]),
-                moeda(p["quantidade"] * p["preco"]),
-                "Estoque baixo" if baixo else "Normal"
+                produto["id"],
+                produto["nome"],
+                produto["quantidade"],
+                moeda(produto["preco"]),
+                moeda(
+                    produto["quantidade"] * produto["preco"]
+                ),
+                "Estoque baixo" if baixo else "Normal",
             ]
 
             for coluna, valor in enumerate(valores):
                 ctk.CTkLabel(
-                    tabela, text=str(valor),
-                    text_color=VERMELHO if baixo and coluna == 5 else TEXTO,
-                    anchor="w", font=ctk.CTkFont(size=12)
+                    tabela,
+                    text=str(valor),
+                    text_color=(
+                        VERMELHO
+                        if baixo and coluna == 5
+                        else TEXTO
+                    ),
+                    anchor="w",
+                    font=ctk.CTkFont(size=12),
                 ).grid(
-                    row=indice, column=coluna, sticky="ew",
-                    padx=8, pady=10
+                    row=indice,
+                    column=coluna,
+                    sticky="ew",
+                    padx=8,
+                    pady=10,
                 )
 
-            ctk.CTkFrame(
-                tabela, height=1, fg_color=BORDA
-            ).grid(row=indice, column=0, columnspan=6, sticky="ew")
-
             acoes = ctk.CTkFrame(
-                tabela, fg_color="transparent"
+                tabela,
+                fg_color="transparent",
             )
-            acoes.grid(row=indice, column=6, padx=5)
+            acoes.grid(
+                row=indice,
+                column=6,
+                padx=5,
+                pady=4,
+            )
+
+           
+            ctk.CTkButton(
+                acoes,
+                text="Editar",
+                width=75,
+                height=30,
+                fg_color=AZUL,
+                hover_color=AZUL_HOVER,
+                command=lambda pid=produto["id"]: (
+                    self.editar_produto(pid)
+                ),
+            ).pack(side="left", padx=3)
+
+            ctk.CTkButton(
+                acoes,
+                text="Excluir",
+                width=75,
+                height=30,
+                fg_color=VERMELHO,
+                hover_color="#B91C1C",
+                command=lambda pid=produto["id"]: (
+                    self.excluir_produto(pid)
+                ),
+            ).pack(side="left", padx=3)
+
+
             # As ações ficam disponíveis na página Movimentações.
 
     def formulario_produto(self):
@@ -627,6 +770,205 @@ class StockFlowApp(ctk.CTk):
             fg_color=AZUL, hover_color=AZUL_HOVER,
             command=salvar
         ).pack(fill="x", padx=28, pady=22)
+
+        
+    def editar_produto(self, produto_id):
+        produto = next(
+            (
+                p for p in self.produtos
+                if p["id"] == produto_id
+            ),
+            None,
+        )
+
+        if produto is None:
+            messagebox.showerror(
+                "Produto não encontrado",
+                "Não foi possível localizar esse produto.",
+                parent=self,
+            )
+            return
+
+        janela = ctk.CTkToplevel(self)
+        janela.title("Editar produto")
+        janela.geometry("430x470")
+        janela.resizable(False, False)
+        janela.configure(fg_color=FUNDO)
+        janela.transient(self)
+        janela.grab_set()
+
+        ctk.CTkLabel(
+            janela,
+            text="Editar produto",
+            font=ctk.CTkFont(size=24, weight="bold"),
+            text_color=TEXTO,
+        ).pack(anchor="w", padx=28, pady=(25, 6))
+
+        ctk.CTkLabel(
+            janela,
+            text=f"ID do produto: {produto['id']}",
+            text_color=SECUNDARIO,
+        ).pack(anchor="w", padx=28, pady=(0, 18))
+
+        ctk.CTkLabel(
+            janela,
+            text="Nome do produto",
+            text_color=SECUNDARIO,
+        ).pack(anchor="w", padx=28, pady=(8, 4))
+
+        campo_nome = ctk.CTkEntry(
+            janela,
+            height=38,
+        )
+        campo_nome.pack(fill="x", padx=28)
+        campo_nome.insert(0, produto["nome"])
+
+        ctk.CTkLabel(
+            janela,
+            text="Preço unitário (R$)",
+            text_color=SECUNDARIO,
+        ).pack(anchor="w", padx=28, pady=(12, 4))
+
+        campo_preco = ctk.CTkEntry(
+            janela,
+            height=38,
+        )
+        campo_preco.pack(fill="x", padx=28)
+        campo_preco.insert(
+            0,
+            str(produto["preco"]).replace(".", ","),
+        )
+
+        ctk.CTkLabel(
+            janela,
+            text="Estoque mínimo",
+            text_color=SECUNDARIO,
+        ).pack(anchor="w", padx=28, pady=(12, 4))
+
+        campo_minimo = ctk.CTkEntry(
+            janela,
+            height=38,
+        )
+        campo_minimo.pack(fill="x", padx=28)
+        campo_minimo.insert(
+            0,
+            str(produto["estoque_minimo"]),
+        )
+
+        def salvar_edicao():
+            nome = campo_nome.get().strip()
+
+            if not nome:
+                messagebox.showwarning(
+                    "Validação",
+                    "Informe o nome do produto.",
+                    parent=janela,
+                )
+                return
+
+            try:
+                preco = float(
+                    campo_preco.get().strip().replace(",", ".")
+                )
+                minimo = int(campo_minimo.get().strip())
+
+                if preco < 0 or minimo < 0:
+                    raise ValueError
+
+            except ValueError:
+                messagebox.showwarning(
+                    "Valores inválidos",
+                    "Informe um preço válido e um estoque mínimo "
+                    "que seja um número inteiro não negativo.",
+                    parent=janela,
+                )
+                return
+
+            dados_anteriores = {
+                "nome": produto["nome"],
+                "preco": produto["preco"],
+                "estoque_minimo": produto["estoque_minimo"],
+            }
+
+            produto["nome"] = nome
+            produto["preco"] = preco
+            produto["estoque_minimo"] = minimo
+
+            if not salvar_json(
+                ARQUIVO_PRODUTOS,
+                self.produtos,
+            ):
+                produto.update(dados_anteriores)
+                return
+
+            janela.destroy()
+            self.mostrar_pagina("Produtos")
+
+            messagebox.showinfo(
+                "Sucesso",
+                f"Produto '{nome}' atualizado!",
+                parent=self,
+            )
+
+        ctk.CTkButton(
+            janela,
+            text="Salvar alterações",
+            height=42,
+            fg_color=AZUL,
+            hover_color=AZUL_HOVER,
+            command=salvar_edicao,
+        ).pack(fill="x", padx=28, pady=24)
+
+
+    def excluir_produto(self, produto_id):
+        produto = next(
+            (
+                p for p in self.produtos
+                if p["id"] == produto_id
+            ),
+            None,
+        )
+
+        if produto is None:
+            messagebox.showerror(
+                "Produto não encontrado",
+                "Não foi possível localizar esse produto.",
+                parent=self,
+            )
+            return
+
+        confirmar = messagebox.askyesno(
+            "Confirmar exclusão",
+            (
+                f"Tem certeza que deseja excluir "
+                f"'{produto['nome']}'?\n\n"
+                "Essa ação não poderá ser desfeita.\n"
+                "O histórico de movimentações será preservado."
+            ),
+            parent=self,
+        )
+
+        if not confirmar:
+            return
+
+        indice = self.produtos.index(produto)
+        produto_removido = self.produtos.pop(indice)
+
+        if not salvar_json(
+            ARQUIVO_PRODUTOS,
+            self.produtos,
+        ):
+            self.produtos.insert(indice, produto_removido)
+            return
+
+        self.mostrar_pagina("Produtos")
+
+        messagebox.showinfo(
+            "Produto excluído",
+            f"'{produto['nome']}' foi excluído com sucesso.",
+            parent=self,
+        )
+
 
     # --------------------------------------------------
     # MOVIMENTAÇÕES
