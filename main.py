@@ -11,9 +11,11 @@ import customtkinter as ctk
 # CONFIGURAÇÕES
 # --------------------------------------------------
 
-PASTA = Path(__file__).parent
-ARQUIVO_PRODUTOS = PASTA / "produtos.json"
-ARQUIVO_MOVIMENTACOES = PASTA / "movimentacoes.json"
+PASTA_DADOS = Path.home() / "Documents" / "StockFlow" / "dados"
+PASTA_DADOS.mkdir(parents=True, exist_ok=True)
+
+ARQUIVO_PRODUTOS = PASTA_DADOS / "produtos.json"
+ARQUIVO_MOVIMENTACOES = PASTA_DADOS / "movimentacoes.json"
 ESTOQUE_MINIMO_PADRAO = 5
 
 ctk.set_appearance_mode("dark")
